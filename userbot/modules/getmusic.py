@@ -4,10 +4,12 @@
 import asyncio
 import glob
 import os
+import shutil
 import subprocess
 import time
 from asyncio.exceptions import TimeoutError
 
+import deezloader
 import requests
 from bs4 import BeautifulSoup
 from hachoir.metadata import extractMetadata
@@ -15,9 +17,16 @@ from hachoir.parser import createParser
 from pylast import User
 from telethon import events
 from telethon.errors.rpcerrorlist import YouBlockedUserError
-from telethon.tl.types import DocumentAttributeVideo
+from telethon.tl.types import DocumentAttributeAudio, DocumentAttributeVideo
 
-from userbot import CMD_HELP, LASTFM_USERNAME, bot, lastfm
+from userbot import (
+    CMD_HELP,
+    DEEZER_ARL_TOKEN,
+    LASTFM_USERNAME,
+    TEMP_DOWNLOAD_DIRECTORY,
+    bot,
+    lastfm,
+)
 from userbot.events import register
 from userbot.utils import progress
 
@@ -299,6 +308,148 @@ async def _(event):
         return await event.edit(
             "`Error: `@MusicHuntersBot` is not responding or Song not found!.`"
         )
+
+
+@register(outgoing=True, pattern=r"^\.deez (.+?|) (FLAC|MP3\_320|MP3\_256|MP3\_128)")
+async def _(event):
+    """DeezLoader by @An0nimia. Ported for UniBorg by @SpEcHlDe"""
+    if event.fwd_from:
+        return
+
+    strings = {
+        "name": "DeezLoad",
+        "arl_token_cfg_doc": "ARL Token for Deezer",
+        "invalid_arl_token": "please set the required variables for this module",
+        "wrong_cmd_syntax": "bruh, now i think how far should we go. please terminate my Session.",
+        "server_error": "We're experiencing technical difficulties.",
+        "processing": "`Downloading...`",
+        "uploading": "`Uploading...`",
+    }
+
+    ARL_TOKEN = DEEZER_ARL_TOKEN
+
+    if ARL_TOKEN is None:
+        await event.edit(strings["invalid_arl_token"])
+        return
+
+    try:
+        loader = deezloader.Login(ARL_TOKEN)
+    except Exception as er:
+        await event.edit(str(er))
+        return
+
+    temp_dl_path = os.path.join(TEMP_DOWNLOAD_DIRECTORY, str(time.time()))
+    if not os.path.exists(temp_dl_path):
+        os.makedirs(temp_dl_path)
+
+    required_link = event.pattern_match.group(1)
+    required_qty = event.pattern_match.group(2)
+
+    await event.edit(strings["processing"])
+
+    if "spotify" in required_link:
+        if "track" in required_link:
+            required_track = loader.download_trackspo(
+                required_link,
+                output=temp_dl_path,
+                quality=required_qty,
+                recursive_quality=True,
+                recursive_download=True,
+                not_interface=True,
+            )
+            await event.edit(strings["uploading"])
+            await upload_track(required_track, event)
+            shutil.rmtree(temp_dl_path)
+            await event.delete()
+
+        elif "album" in required_link:
+            reqd_albums = loader.download_albumspo(
+                required_link,
+                output=temp_dl_path,
+                quality=required_qty,
+                recursive_quality=True,
+                recursive_download=True,
+                not_interface=True,
+                zips=False,
+            )
+            await event.edit(strings["uploading"])
+            for required_track in reqd_albums:
+                await upload_track(required_track, event)
+            shutil.rmtree(temp_dl_path)
+            await event.delete()
+
+    elif "deezer" in required_link:
+        if "track" in required_link:
+            required_track = loader.download_trackdee(
+                required_link,
+                output=temp_dl_path,
+                quality=required_qty,
+                recursive_quality=True,
+                recursive_download=True,
+                not_interface=True,
+            )
+            await event.edit(strings["uploading"])
+            await upload_track(required_track, event)
+            shutil.rmtree(temp_dl_path)
+            await event.delete()
+
+        elif "album" in required_link:
+            reqd_albums = loader.download_albumdee(
+                required_link,
+                output=temp_dl_path,
+                quality=required_qty,
+                recursive_quality=True,
+                recursive_download=True,
+                not_interface=True,
+                zips=False,
+            )
+            await event.edit(strings["uploading"])
+            for required_track in reqd_albums:
+                await upload_track(required_track, event)
+            shutil.rmtree(temp_dl_path)
+            await event.delete()
+
+    else:
+        await event.edit(strings["wrong_cmd_syntax"])
+
+
+async def upload_track(track_location, message):
+    metadata = extractMetadata(createParser(track_location))
+    duration = 0
+    title = ""
+    performer = ""
+    if metadata.has("duration"):
+        duration = metadata.get("duration").seconds
+    if metadata.has("title"):
+        title = metadata.get("title")
+    if metadata.has("artist"):
+        performer = metadata.get("artist")
+    document_attributes = [
+        DocumentAttributeAudio(
+            duration=duration,
+            voice=False,
+            title=title,
+            performer=performer,
+            waveform=None,
+        )
+    ]
+    supports_streaming = True
+    force_document = False
+    caption_rts = os.path.basename(track_location)
+    c_time = time.time()
+    await message.client.send_file(
+        message.chat_id,
+        track_location,
+        caption=caption_rts,
+        force_document=force_document,
+        supports_streaming=supports_streaming,
+        allow_cache=False,
+        attributes=document_attributes,
+        progress_callback=lambda d, t: asyncio.get_event_loop().create_task(
+            progress(d, t, message, c_time, "[UPLOAD]"),
+        ),
+    )
+    os.remove(track_location)
 
 
 CMD_HELP.update(
