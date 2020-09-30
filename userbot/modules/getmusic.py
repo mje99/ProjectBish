@@ -264,7 +264,7 @@ async def _(event):
         await event.edit("`Enter a valid link to download from`")
     else:
         await event.edit("`Processing...`")
-    chat = "@MusicHuntersBot"
+    chat = "@MusicsHunterBot"
     try:
         async with bot.conversation(chat) as conv:
             try:
@@ -275,7 +275,7 @@ async def _(event):
                 song = await conv.get_response()
                 await bot.send_read_acknowledge(conv.chat_id)
             except YouBlockedUserError:
-                await event.edit("`Unblock `@MusicHuntersBot` and retry`")
+                await event.edit("`Unblock `@MusicsHunterBot` and retry`")
                 return
             await bot.send_file(event.chat_id, song, caption=details.text)
             await event.client.delete_messages(
@@ -284,7 +284,7 @@ async def _(event):
             await event.delete()
     except TimeoutError:
         return await event.edit(
-            "`Error: `@MusicHuntersBot` is not responding or Song not found!.`"
+            "`Error: `@MusicsHunterBot` is not responding or Song not found!.`"
         )
 
 
@@ -445,7 +445,7 @@ CMD_HELP.update(
         ">`.net now`"
         "\nUsage: Download current LastFM scrobble use `@WooMaiBot`.\n\n"
         ">`.sdd <Spotify/Deezer Link>`"
-        "\nUsage: Download music from Spotify or Deezer use `@MusicHuntersBot`.\n\n"
+        "\nUsage: Download music from Spotify or Deezer use `@MusicsHunterBot`.\n\n"
         ">`.deez` <spotify/deezer link> FORMAT\n"
         "Usage: Download music from deezer or spotify.\n"
         "**Format** `FLAC`, `MP3_320`, `MP3_256`, `MP3_128`."
