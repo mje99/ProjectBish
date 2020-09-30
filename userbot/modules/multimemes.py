@@ -16,14 +16,18 @@ import time
 from asyncio.exceptions import TimeoutError
 
 from glitch_this import ImageGlitcher
+from hachoir.metadata import extractMetadata
+from hachoir.parser import createParser
 from PIL import Image, ImageDraw, ImageFont
 from telethon import events, functions, types
 from telethon.errors.rpcerrorlist import YouBlockedUserError
+from telethon.tl.types import DocumentAttributeFilename
 
 from userbot import CMD_HELP, TEMP_DOWNLOAD_DIRECTORY, bot
 from userbot.events import register
 from userbot.utils import progress
-from userbot.utils.tools import check_media
+
+THUMB_IMAGE_PATH = "./thumb_image.jpg"
 
 Glitched = TEMP_DOWNLOAD_DIRECTORY + "glitch.gif"
 
@@ -53,33 +57,43 @@ async def glitch(event):
     if not reply_message.media:
         await event.edit("`reply to a image/sticker`")
         return
-    await bot.download_file(reply_message.media)
     await event.edit("`Downloading Media..`")
-    if event.is_reply:
-        data = await check_media(reply_message)
-        if isinstance(data, bool):
-            await event.edit("`Unsupported Files...`")
-            return
+    if reply_message.photo:
+        glitch_file = await bot.download_media(
+            reply_message,
+            "glitch.png",
+        )
+    elif (
+        DocumentAttributeFilename(file_name="AnimatedSticker.tgs")
+        in reply_message.media.document.attributes
+    ):
+        await bot.download_media(
+            reply_message,
+            "anim.tgs",
+        )
+        os.system("lottie_convert.py anim.tgs anim.png")
+        glitch_file = "anim.png"
+    elif reply_message.video:
+        video = await bot.download_media(
+            reply_message,
+            "glitch.mp4",
+        )
+        extractMetadata(createParser(video))
+        os.system("ffmpeg -i glitch.mp4 -vframes 1 -an -s 480x360 -ss 1 glitch.png")
+        glitch_file = "glitch.png"
     else:
-        await event.edit("`Reply to Any Media Sur`")
-        return
-
+        glitch_file = await bot.download_media(
+            reply_message,
+            "glitch.png",
+        )
     try:
         value = int(event.pattern_match.group(1))
         if value > 8:
             raise ValueError
     except ValueError:
         value = 2
-    await event.edit("```Glitching This Media```")
+    await event.edit("```Glitching This Media..```")
     await asyncio.sleep(2)
-    file_name = "glitch.png"
-    to_download_directory = TEMP_DOWNLOAD_DIRECTORY
-    downloaded_file_name = os.path.join(to_download_directory, file_name)
-    downloaded_file_name = await bot.download_media(
-        reply_message,
-        downloaded_file_name,
-    )
-    glitch_file = downloaded_file_name
     glitcher = ImageGlitcher()
     img = Image.open(glitch_file)
     glitch_img = glitcher.glitch_image(img, value, color_offset=True, gif=True)
@@ -93,7 +107,7 @@ async def glitch(event):
         duration=DURATION,
         loop=LOOP,
     )
-    await event.edit("`Uploading Glitched Media...`")
+    await event.edit("`Uploading Glitched Media..`")
     c_time = time.time()
     nosave = await event.client.send_file(
         event.chat_id,
@@ -117,6 +131,8 @@ async def glitch(event):
         )
     )
     os.remove(glitch_file)
+    os.system("rm -rf *.tgs")
+    os.system("rm -rf *.mp4")
 
 
 @register(outgoing=True, pattern=r"^\.mmf(?: |$)(.*)")
@@ -130,34 +146,49 @@ async def mim(event):
     if not reply_message.media:
         await event.edit("`Reply to a image/sticker/gif.`")
         return
-    await bot.download_file(reply_message.media)
-    if event.is_reply:
-        data = await check_media(reply_message)
-        if isinstance(data, bool):
-            await event.edit("`Unsupported Files...`")
-            return
-
-        await event.edit(
-            "```Transfiguration Time! Mwahaha Memifying this image! (」ﾟﾛﾟ)｣ ```"
+    await event.edit("`Downloading Media..`")
+    if reply_message.photo:
+        dls_loc = await bot.download_media(
+            reply_message,
+            "meme.png",
         )
-        await asyncio.sleep(5)
-        text = event.pattern_match.group(1)
-        if event.reply_to_msg_id:
-            file_name = "meme.jpg"
-            to_download_directory = TEMP_DOWNLOAD_DIRECTORY
-            downloaded_file_name = os.path.join(to_download_directory, file_name)
-            downloaded_file_name = await bot.download_media(
-                reply_message,
-                downloaded_file_name,
-            )
-            dls_loc = downloaded_file_name
-        webp_file = await draw_meme_text(dls_loc, text)
-        await event.client.send_file(
-            event.chat_id, webp_file, reply_to=event.reply_to_msg_id
+    elif (
+        DocumentAttributeFilename(file_name="AnimatedSticker.tgs")
+        in reply_message.media.document.attributes
+    ):
+        await bot.download_media(
+            reply_message,
+            "meme.tgs",
         )
-        await event.delete()
-        os.remove(webp_file)
-        os.remove(dls_loc)
+        os.system("lottie_convert.py meme.tgs meme.png")
+        dls_loc = "meme.png"
+    elif reply_message.video:
+        video = await bot.download_media(
+            reply_message,
+            "meme.mp4",
+        )
+        extractMetadata(createParser(video))
+        os.system("ffmpeg -i meme.mp4 -vframes 1 -an -s 480x360 -ss 1 meme.png")
+        dls_loc = "meme.png"
+    else:
+        dls_loc = await bot.download_media(
+            reply_message,
+            "meme.png",
+        )
+    await event.edit(
+        "```Transfiguration Time! Mwahaha Memifying this image! (」ﾟﾛﾟ)｣ ```"
+    )
+    await asyncio.sleep(5)
+    text = event.pattern_match.group(1)
+    webp_file = await draw_meme_text(dls_loc, text)
+    await event.client.send_file(
+        event.chat_id, webp_file, reply_to=event.reply_to_msg_id
+    )
+    await event.delete()
+    os.system("rm -rf *.tgs")
+    os.system("rm -rf *.mp4")
+    os.system("rm -rf *.png")
+    os.remove(webp_file)
 
 
 async def draw_meme_text(image_path, text):

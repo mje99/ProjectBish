@@ -57,3 +57,5 @@ youtube_search
 justwatch
 validators
 glitch_this
+lottie
+cairosvg
