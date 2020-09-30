@@ -5,7 +5,6 @@ import asyncio
 import glob
 import os
 import shutil
-import subprocess
 import time
 from asyncio.exceptions import TimeoutError
 
@@ -49,52 +48,6 @@ async def getmusicvideo(cat):
         break
     command = 'youtube-dl -f "[filesize<50M]" --merge-output-format mp4 ' + video_link
     os.system(command)
-
-
-@register(outgoing=True, pattern=r"^\.song (.*)")
-async def _(event):
-    reply_to_id = event.message.id
-    if event.reply_to_msg_id:
-        reply_to_id = event.reply_to_msg_id
-    reply = await event.get_reply_message()
-    if event.pattern_match.group(1):
-        query = event.pattern_match.group(1)
-        await event.edit("`Wait..! I am finding your song..`")
-    elif reply.message:
-        query = reply.message
-        await event.edit("`Wait..! I am finding your song..`")
-    else:
-        await event.edit("`What I am Supposed to find?`")
-        return
-
-    getmusic(str(query), "320k")
-    l = glob.glob("*.mp3")
-    loa = l[0]
-    img_extensions = ["webp", "jpg", "jpeg", "webp"]
-    img_filenames = [
-        fn_img
-        for fn_img in os.listdir()
-        if any(fn_img.endswith(ext_img) for ext_img in img_extensions)
-    ]
-    thumb_image = img_filenames[0]
-    await event.edit("`Yeah.. Uploading your song..`")
-    c_time = time.time()
-    await event.client.send_file(
-        event.chat_id,
-        loa,
-        force_document=True,
-        thumb=thumb_image,
-        allow_cache=False,
-        caption=query,
-        reply_to=reply_to_id,
-        progress_callback=lambda d, t: asyncio.get_event_loop().create_task(
-            progress(d, t, event, c_time, "[UPLOAD]", loa)
-        ),
-    )
-    await event.delete()
-    os.system("rm -rf *.mp3")
-    os.remove(thumb_image)
-    subprocess.check_output("rm -rf *.mp3", shell=True)
 
 
 @register(outgoing=True, pattern=r"^\.vsong(?: |$)(.*)")
@@ -255,7 +208,7 @@ async def _(event):
         )
 
 
-@register(outgoing=True, pattern=r"^\.sdd(?: |$)(.*)")
+@register(outgoing=True, pattern=r"^\.mhb(?: |$)(.*)")
 async def _(event):
     if event.fwd_from:
         return
@@ -444,7 +397,7 @@ CMD_HELP.update(
         "\nUsage: Download music use `@WooMaiBot`.\n\n"
         ">`.net now`"
         "\nUsage: Download current LastFM scrobble use `@WooMaiBot`.\n\n"
-        ">`.sdd <Spotify/Deezer Link>`"
+        ">`.mhb <Spotify/Deezer Link>`"
         "\nUsage: Download music from Spotify or Deezer use `@MusicsHunterBot`.\n\n"
         ">`.deez` <spotify/deezer link> FORMAT\n"
         "Usage: Download music from deezer or spotify.\n"
